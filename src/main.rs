@@ -55,29 +55,44 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-const MIN_TEMP: i32 = -999;
-const MAX_TEMP: i32 = 999;
+const MIN_TEMP: i32 = -999; // -99.9C
+const MAX_TEMP: i32 = 999; // 99.9C
 const CHUNK_SIZE: u64 = 10_000;
+
+macro_rules! generate_line {
+    ($stations:expr, $out_buf:expr) => {{
+        let station = $stations
+            .choose(&mut rand::thread_rng())
+            .ok_or_else(|| color_eyre::eyre::eyre!("No stations"))?;
+        let measurement = rand::thread_rng().gen_range(MIN_TEMP..MAX_TEMP);
+        let line = format!(
+            "{};{}.{}\n",
+            station.id,
+            measurement / 10,
+            if measurement < 0 {
+                measurement * -1 % 10
+            } else {
+                measurement % 10
+            }
+        );
+        $out_buf.push_str(&line);
+    }};
+}
 
 fn generate_lines(stations: &Vec<WeatherStation>, rows: u64, output_path: String) -> Result<()> {
     let bar_style = ProgressStyle::with_template(
         "[{elapsed_precise} elapsed] [{eta_precise} remaining] [{percent:.2}%] {msg}\n{bar:80.cyan/blue} ",
     )
     .expect("Could not create progress bar style");
-    let chunk_count = rows / CHUNK_SIZE + 1;
-    let bar = ProgressBar::new(chunk_count).with_style(bar_style);
+    let chunk_count = rows / CHUNK_SIZE;
+    let bar = ProgressBar::new(chunk_count + 1).with_style(bar_style);
     bar.enable_steady_tick(time::Duration::from_millis(1000));
     let mut file = File::create(output_path)?;
     let mut out_buf;
     for _ in 0..chunk_count {
         out_buf = String::new();
         for _ in 0..CHUNK_SIZE {
-            let station = stations
-                .choose(&mut rand::thread_rng())
-                .ok_or_else(|| color_eyre::eyre::eyre!("No stations"))?;
-            let measurement = rand::thread_rng().gen_range(MIN_TEMP..MAX_TEMP);
-            let line = format!("{};{}\n", station.id, measurement);
-            out_buf.push_str(&line);
+            generate_line!(&stations, &mut out_buf);
         }
         file.write_all(out_buf.as_bytes())?;
         bar.inc(1);
@@ -86,25 +101,12 @@ fn generate_lines(stations: &Vec<WeatherStation>, rows: u64, output_path: String
     // Extra chunk with remainder rows
     out_buf = String::new();
     for _ in 0..rows % CHUNK_SIZE {
-        let station = stations
-            .choose(&mut rand::thread_rng())
-            .ok_or_else(|| color_eyre::eyre::eyre!("No stations"))?;
-        let measurement = rand::thread_rng().gen_range(MIN_TEMP..MAX_TEMP);
-        let line = format!(
-            "{};{}.{}\n",
-            station.id,
-            measurement / 10,
-            if measurement < 10 {
-                measurement * -1
-            } else {
-                measurement
-            } % 10
-        );
-        out_buf.push_str(&line);
+        generate_line!(&stations, &mut out_buf);
     }
 
     file.write_all(out_buf.as_bytes())?;
     bar.inc(1);
+
     let size = file.metadata()?.len();
     bar.finish_with_message(format!(
         "Completed, final file size: {}",
