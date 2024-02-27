@@ -64,7 +64,7 @@ macro_rules! generate_line {
         let station = $stations
             .choose(&mut rand::thread_rng())
             .ok_or_else(|| color_eyre::eyre::eyre!("No stations"))?;
-        let measurement = rand::thread_rng().gen_range(MIN_TEMP..MAX_TEMP);
+        let measurement = rand::thread_rng().gen_range(MIN_TEMP..=MAX_TEMP);
         let line = format!(
             "{};{}.{}\n",
             station.id,
