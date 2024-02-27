@@ -1,0 +1,12 @@
+{
+	"files.insertFinalNewline": true,
+	"files.eol": "\n",
+	"files.encoding": "utf8",
+	"prettier.bracketSpacing": false,
+	"editor.formatOnPaste": true,
+	"editor.formatOnSave": true,
+	"editor.rulers": [
+		80,
+	],
+	"editor.minimap.maxColumn": 80
+}

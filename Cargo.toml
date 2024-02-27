@@ -1,0 +1,11 @@
+[package]
+name = "billion-row-gen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.1", features = ["derive"] }
+color-eyre = "0.6.2"
+indicatif = { version = "0.17.8", features = ["tokio"] }
+rand = "0.8.5"
+tokio = "1.36.0"
