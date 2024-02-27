@@ -1,5 +1,7 @@
 [package]
 name = "billion-row-gen"
+description = "Generates a large number of rows for the one billion row challenge"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
