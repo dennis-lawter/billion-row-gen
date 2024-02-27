@@ -9,3 +9,9 @@ color-eyre = "0.6.2"
 indicatif = { version = "0.17.8", features = ["tokio"] }
 rand = "0.8.5"
 tokio = "1.36.0"
+
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+overflow-checks = false

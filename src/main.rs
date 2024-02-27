@@ -1,7 +1,7 @@
 use core::time;
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, BufWriter, Write},
 };
 
 use clap::Parser;
@@ -60,11 +60,11 @@ const MAX_TEMP: i32 = 999; // 99.9C
 const CHUNK_SIZE: u64 = 10_000;
 
 macro_rules! generate_line {
-    ($stations:expr, $out_buf:expr) => {{
+    ($stations:expr, $rng:expr, $out_buf:expr) => {{
         let station = $stations
-            .choose(&mut rand::thread_rng())
+            .choose(&mut $rng)
             .ok_or_else(|| color_eyre::eyre::eyre!("No stations"))?;
-        let measurement = rand::thread_rng().gen_range(MIN_TEMP..=MAX_TEMP);
+        let measurement = $rng.gen_range(MIN_TEMP..=MAX_TEMP);
         let line = format!(
             "{};{}.{}\n",
             station.id,
@@ -80,6 +80,8 @@ macro_rules! generate_line {
 }
 
 fn generate_lines(stations: &Vec<WeatherStation>, rows: u64, output_path: String) -> Result<()> {
+    let average_station_name_length =
+        stations.iter().map(|s| s.id.len()).sum::<usize>() / stations.len();
     let bar_style = ProgressStyle::with_template(
         "[{elapsed_precise} elapsed] [{eta_precise} remaining] [{percent:.2}%] {msg}\n{bar:80.cyan/blue} ",
     )
@@ -88,24 +90,31 @@ fn generate_lines(stations: &Vec<WeatherStation>, rows: u64, output_path: String
     let bar = ProgressBar::new(chunk_count + 1).with_style(bar_style);
     bar.enable_steady_tick(time::Duration::from_millis(1000));
     let mut file = File::create(output_path)?;
-    let mut out_buf;
+    let mut writer = BufWriter::new(&mut file);
+
+    // pre-allocate a sizable buffer, +5 for " -99.9", +1 for \n, and +1 for extra space
+    let out_buf_len = CHUNK_SIZE as usize * (average_station_name_length + 7);
+    let mut out_buf = String::with_capacity(out_buf_len);
+    let mut rng = rand::thread_rng();
     for _ in 0..chunk_count {
-        out_buf = String::new();
+        out_buf.clear();
         for _ in 0..CHUNK_SIZE {
-            generate_line!(&stations, &mut out_buf);
+            generate_line!(&stations, &mut rng, &mut out_buf);
         }
-        file.write_all(out_buf.as_bytes())?;
+        writer.write_all(out_buf.as_bytes())?;
         bar.inc(1);
     }
 
     // Extra chunk with remainder rows
-    out_buf = String::new();
+    out_buf.clear();
     for _ in 0..rows % CHUNK_SIZE {
-        generate_line!(&stations, &mut out_buf);
+        generate_line!(&stations, &mut rng, &mut out_buf);
     }
 
-    file.write_all(out_buf.as_bytes())?;
+    writer.write_all(out_buf.as_bytes())?;
     bar.inc(1);
+
+    drop(writer);
 
     let size = file.metadata()?.len();
     bar.finish_with_message(format!(
